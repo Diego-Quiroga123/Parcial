@@ -8,6 +8,9 @@ public class PlayerDeath : MonoBehaviour
     [SerializeField] private float fallLimitY = -15f;     // Si el jugador baja de esta Y, muere
     [SerializeField] private float restartDelay = 1f;     // Segundos antes de reiniciar el nivel
 
+    [Header("Aplastar enemigos")]
+    [SerializeField] private float stompBounceForce = 10f; // Rebote al aplastar un enemigo
+
     private bool isDead;
     private Rigidbody2D rb;
     private PlayerMovement2D movement;
@@ -27,14 +30,36 @@ public class PlayerDeath : MonoBehaviour
 
     private void OnCollisionEnter2D(Collision2D collision)
     {
-        if (collision.gameObject.CompareTag(enemyTag))
-            Die();
+        if (isDead || !collision.gameObject.CompareTag(enemyTag)) return;
+
+        // Si el golpe viene desde arriba (la normal apunta hacia arriba), aplastamos al enemigo
+        foreach (ContactPoint2D contact in collision.contacts)
+        {
+            if (contact.normal.y > 0.5f)
+            {
+                StompEnemy(collision.gameObject);
+                return;
+            }
+        }
+
+        // Si fue un golpe lateral o desde abajo, el jugador muere
+        Die();
     }
 
     private void OnTriggerEnter2D(Collider2D other)
     {
-        if (other.CompareTag(enemyTag))
+        // Para enemigos o trampas configurados como Trigger: siempre matan
+        if (!isDead && other.CompareTag(enemyTag))
             Die();
+    }
+
+    private void StompEnemy(GameObject enemyObject)
+    {
+        EnemyMovement2D enemy = enemyObject.GetComponentInParent<EnemyMovement2D>();
+        if (enemy != null) enemy.Die();
+
+        // Rebote del jugador
+        rb.linearVelocity = new Vector2(rb.linearVelocity.x, stompBounceForce);
     }
 
     public void Die()

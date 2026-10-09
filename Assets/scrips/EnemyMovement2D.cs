@@ -15,6 +15,10 @@ public class EnemyMovement2D : MonoBehaviour
     [SerializeField] private SpriteRenderer spriteRenderer; // Si se deja vacío, se busca solo
     [SerializeField] private bool spriteFacesLeft = true;   // Los enemigos de Pixel Adventure suelen mirar a la izquierda
 
+    [Header("Muerte")]
+    [SerializeField] private float deathJumpForce = 5f;     // Saltito hacia arriba al ser aplastado
+    [SerializeField] private float destroyAfterDeath = 1.5f;
+
     [Header("Opcional")]
     [SerializeField] private bool destroyWhenFarLeft = true;
     [SerializeField] private float destroyAtX = -30f;
@@ -23,6 +27,7 @@ public class EnemyMovement2D : MonoBehaviour
     private Transform player;
     private int direction;      // -1 = izquierda, 1 = derecha
     private bool isActive;
+    private bool isDead;
 
     private void Awake()
     {
@@ -44,6 +49,8 @@ public class EnemyMovement2D : MonoBehaviour
 
     private void Update()
     {
+        if (isDead) return;
+
         CheckActivation();
 
         if (destroyWhenFarLeft && transform.position.x < destroyAtX)
@@ -52,6 +59,8 @@ public class EnemyMovement2D : MonoBehaviour
 
     private void FixedUpdate()
     {
+        if (isDead) return;
+
         float xVelocity = isActive ? direction * speed : 0f;
         rb.linearVelocity = new Vector2(xVelocity, rb.linearVelocity.y);
     }
@@ -78,14 +87,15 @@ public class EnemyMovement2D : MonoBehaviour
 
     private void CheckWallHit(Collision2D collision)
     {
+        if (isDead) return;
+
         // Ignorar al jugador
         if (collision.gameObject.CompareTag("Player")) return;
 
         foreach (ContactPoint2D contact in collision.contacts)
         {
             // La normal apunta desde el objeto golpeado hacia este enemigo.
-            // Solo giramos si el choque es lateral Y el enemigo se está moviendo
-            // hacia ese objeto (así nunca gira dos veces por el mismo golpe).
+            // Solo giramos si el choque es lateral Y el enemigo se está moviendo hacia ese objeto.
             if (Mathf.Abs(contact.normal.x) > 0.5f && contact.normal.x * direction < -0.5f)
             {
                 TurnAround();
@@ -101,6 +111,26 @@ public class EnemyMovement2D : MonoBehaviour
 
         // Aplicar la nueva velocidad de inmediato para que se despegue de la pared
         rb.linearVelocity = new Vector2(direction * speed, rb.linearVelocity.y);
+    }
+
+    /// <summary>
+    /// Mata al enemigo (lo llama el jugador al aplastarlo).
+    /// </summary>
+    public void Die()
+    {
+        if (isDead) return;
+        isDead = true;
+        isActive = false;
+
+        // Quitar colliders para que no vuelva a dañar al jugador y caiga por el suelo
+        foreach (Collider2D col in GetComponentsInChildren<Collider2D>())
+            col.enabled = false;
+
+        // Saltito y caída, estilo Mario
+        rb.linearVelocity = new Vector2(0f, deathJumpForce);
+        if (spriteRenderer != null) spriteRenderer.flipY = true;
+
+        Destroy(gameObject, destroyAfterDeath);
     }
 
     private void UpdateSpriteFlip()
